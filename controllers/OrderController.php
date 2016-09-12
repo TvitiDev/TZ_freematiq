@@ -54,9 +54,6 @@ class OrderController extends Controller
     {
         $searchModel = new Orders();
         $searchModel = $searchModel->getOrders(Yii::$app->request->queryParams, $id);
-        if($searchModel) {
-
-        }
         return $this->render('view', [
             'id' => $id,
             'model' => $searchModel,
