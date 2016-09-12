@@ -8,6 +8,7 @@ use yii\bootstrap\Nav;
 use yii\bootstrap\NavBar;
 use yii\widgets\Breadcrumbs;
 use app\assets\AppAsset;
+use yii\helpers\Url;
 
 AppAsset::register($this);
 ?>
@@ -28,7 +29,7 @@ AppAsset::register($this);
     <?php
     NavBar::begin([
         'brandLabel' => 'Freematiq',
-        'brandUrl' => Yii::$app->homeUrl,
+        'brandUrl' => Url::to(['order/index']),
         'options' => [
             'class' => 'navbar-inverse navbar-fixed-top',
         ],
@@ -37,6 +38,8 @@ AppAsset::register($this);
         'options' => ['class' => 'navbar-nav navbar-right'],
         'items' => [
             ['label' => 'Счета', 'url' => ['/order/index']],
+            ['label' => 'Сгенерировать счета', 'linkOptions'=> [ 'target' => '_blanc' ], 'url' => ['/order/generat']],
+            ['label' => 'Произвести транзакции', 'linkOptions'=> [ 'target' => '_blanc' ], 'url' => ['/order/transaction']],
         ],
     ]);
     NavBar::end();

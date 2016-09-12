@@ -53,7 +53,7 @@ class OrderController extends Controller
     public function actionView($id)
     {
         $searchModel = new Orders();
-        $searchModel = $searchModel->getOrders(Yii::$app->request->queryParams);
+        $searchModel = $searchModel->getOrders(Yii::$app->request->queryParams, $id);
         if($searchModel) {
 
         }
@@ -67,6 +67,7 @@ class OrderController extends Controller
 
     /**
      * Метод генерации счетов
+     * Сваливается по недостатку памяти, при генерации большого числа запросов
      */
     public function actionGenerate()
     {
@@ -81,24 +82,30 @@ class OrderController extends Controller
 
     /**
      * Метод транзакции денег
+     * Требует более 256МБ оперативной памяти для выполнения
      */
     public function actionTransaction()
     {
-        Orders::Transaction(2, 3, 1000);
 
-        // set_time_limit(0);
-        // for ($i=0; $i < 10; $i++) {
-        //
-        //
-        //     // списать со счета А
-        //     // зачислить на счет 1
-        //     // списать со счета 1
-        //     // зачислить на счет Б
-        //
-        //     Yii::$app->db->createCommand()->insert('account', [
-        //         'balance' => rand(1000, 1000000) // знаю, что при работе с деньгами лучше работать в копейках, но так как валюта и денежные еденыцы не указаны, то делаю по заданию
-        //     ])->execute();
-        // }
+        set_time_limit(0);
+        for ($i=0; $i < 100000; $i++) {
+
+            $from = rand(1, 100000);
+            $to = rand(1, 100000);
+            if($from == $to) {
+                continue;
+            }
+            $summ = rand(1000, 100000);
+
+            Orders::transaction($from, $to, $summ);
+            unset($from);
+            unset($to);
+            unset($summ);
+            // списать со счета А
+            // зачислить на счет 1
+            // списать со счета 1
+            // зачислить на счет Б
+        }
     }
 
 }

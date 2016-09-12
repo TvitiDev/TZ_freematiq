@@ -21,6 +21,7 @@ use app\models\Account;
  */
 class Orders extends \yii\db\ActiveRecord
 {
+    const STATUS_SUCCESS = 1;
     /**
      * @inheritdoc
      */
@@ -57,7 +58,7 @@ class Orders extends \yii\db\ActiveRecord
         ];
     }
 
-    public function getOrders($params=null)
+    public function getOrders($params=null, $id)
     {
 		$query = new Query;
 
@@ -66,8 +67,8 @@ class Orders extends \yii\db\ActiveRecord
             'query' => $query->select('
 			*')
 			->from('orders')
-            ->where(['account_from' => $this->id])
-            ->orWhere(['account_to' => $this->id]),
+            ->where(['account_from' => $id])
+            ->orWhere(['account_to' => $id]),
 			'pagination' => ['pageSize' => 10,],
 			]);
 
@@ -83,7 +84,27 @@ class Orders extends \yii\db\ActiveRecord
 		return $dataProvider;
     }
 
-    public function Transaction($from, $to, $summ)
+    public function addHistory($from, $to, $summ)
+    {
+        $model = new Orders([
+            'account_from' => $from,
+            'account_to' => $to,
+            'summ' => $summ,
+            'status' => self::STATUS_SUCCESS,
+        ]);
+        if(! $model->save()) {
+            throw new \yii\db\Exception('Fail save');
+        }
+    }
+
+    /**
+     * Перевод денежных средств
+     * @param $from int
+     * @param $to int
+     * @param $summ int
+     * @return bool
+     */
+    public function transaction($from, $to, $summ)
     {
         $transaction = Yii::$app->db->beginTransaction();
 
@@ -98,23 +119,56 @@ class Orders extends \yii\db\ActiveRecord
                 throw new \yii\web\NotFoundHttpException('Счет не найден');
             }
 
-            if($orderFrom->balance >= $summ) {
+            // if($orderFrom->balance >= $summ)
 
-                Yii::$app->db->createCommand('UPDATE `account` SET `balance`= `balance` - :balance WHERE balance >= :balance and id = :id')
-                ->bindValue(':balance', $summ)
-                ->bindValue(':id', $from)
-                ->execute();
+            // списать со счета А
+            $result = Yii::$app->db->createCommand('UPDATE `account` SET `balance`= `balance` - :balance WHERE balance >= :balance and id = :id')
+            ->bindValue(':balance', $summ)
+            ->bindValue(':id', $from)
+            ->execute();
 
-                Yii::$app->db->createCommand('UPDATE `account` SET `balance`= `balance` + :balance WHERE id = :id')
-                ->bindValue(':balance', $summ)
-                ->bindValue(':id', $to)
-                ->execute();
-
+            if(!$result) {
+                throw new \yii\db\Exception('Fail update');
             }
 
+            // зачислить на счет 1
+            $result = Yii::$app->db->createCommand('UPDATE `account` SET `balance`= `balance` + :balance WHERE id = 1')
+            ->bindValue(':balance', $summ)
+            ->execute();
+
+            if(!$result) {
+                throw new \yii\db\Exception('Fail update');
+            }
+
+            self::addHistory($from, 1, $summ);
+
+            // списать со счета 1
+            $result = Yii::$app->db->createCommand('UPDATE `account` SET `balance`= `balance` - :balance WHERE balance >= :balance and id = 1')
+            ->bindValue(':balance', $summ)
+            ->execute();
+
+            if(!$result) {
+                throw new \yii\db\Exception('Fail update');
+            }
+
+            self::addHistory(1, $to, $summ);
+
+            // зачислить на счет Б
+            $result = Yii::$app->db->createCommand('UPDATE `account` SET `balance`= `balance` + :balance WHERE id = :id')
+            ->bindValue(':balance', $summ)
+            ->bindValue(':id', $to)
+            ->execute();
+
+            if(!$result) {
+                throw new \yii\db\Exception('Fail update');
+            }
+
+            self::addHistory($from, $to, $summ);
+
+
             $transaction->commit();
-        } catch (Exception $e) {
-            Yii::error($e);
+        } catch (\Exception $e) {
+            // Yii::error($e);
             $transaction->rollBack();
         }
 
